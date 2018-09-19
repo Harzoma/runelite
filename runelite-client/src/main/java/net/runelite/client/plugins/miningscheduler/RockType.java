@@ -7,9 +7,8 @@ import java.util.Set;
 
 public enum RockType
 {
-    //DEPLETED        (ImmutableSet.of(7469, 7468), -1),
-    //IRON            (ImmutableSet.of(7455, 7488)),
-    //COAL            (ImmutableSet.of(7456, 7489)),
+    //IRON            (ImmutableSet.of(7455, 7488), 0),
+    //COAL            (ImmutableSet.of(7456, 7489), 0),
     //MITHRIL         (ImmutableSet.of(7459, 7492), 2),
     ADAMANTITE      (ImmutableSet.of(7460, 7493), 4),
     RUNITE          (ImmutableSet.of(7461, 7494), 12);
@@ -18,7 +17,7 @@ public enum RockType
     private final Set gameIds;
 
     @Getter
-    private final Integer respawnTime;
+    private final long respawnTime;
 
     RockType(Set gameIds, Integer respawnTime)
     {

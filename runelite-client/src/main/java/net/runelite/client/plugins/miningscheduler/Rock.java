@@ -41,7 +41,7 @@ public class Rock
         return this.location;
     }
 
-    public Integer getRespawnDuration()
+    public long getRespawnDuration()
     {
         return this.type.getRespawnTime();
     }
@@ -66,8 +66,8 @@ public class Rock
         System.out.println("Depleted " + this.getType() + " at " + location.toString());
         isDepleted = true;
         if (!depletedOnLogin) {
-            System.out.println("Next respawn at " +  this.getNextRespawnTime().format(dateFormat));
             nextRespawn = LocalDateTime.now().plusMinutes(this.getRespawnDuration());
+            System.out.println("Next respawn at " +  this.getNextRespawnTime().format(dateFormat));
         }
     }
 

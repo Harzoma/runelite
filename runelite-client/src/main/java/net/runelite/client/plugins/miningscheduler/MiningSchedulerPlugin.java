@@ -6,17 +6,26 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.*;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
+import net.runelite.client.ui.overlay.infobox.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.HashMap;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Queue;
 
 @PluginDescriptor(
         name = "Mining scheduler",
@@ -39,6 +48,12 @@ public class MiningSchedulerPlugin extends Plugin
     private Client client;
 
     @Inject
+    private InfoBoxManager infoBoxManager;
+
+    @Inject
+    private ItemManager itemManager;
+
+    @Inject
     private OverlayManager overlayManager;
 
     @Inject
@@ -46,10 +61,13 @@ public class MiningSchedulerPlugin extends Plugin
 
     private static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-    private final Map<Date, World> schedule = new HashMap<>();
     private final Map<Integer, Map<WorldPoint, Rock>> rockStates = new HashMap<>();
-    private Map<WorldPoint, Rock> rocks;
+    //private final Map<Integer, RespawnTimer> timers = new HashMap<>();
+    private final Queue<RespawnTimer> timers = new LinkedList<>();
 
+
+    private Map<WorldPoint, Rock> rocks;
+    private RespawnTimer currentTimer;
     private Integer currentWorld;
     private boolean hasLoaded;
     private Integer tickCount = 0;
@@ -68,7 +86,7 @@ public class MiningSchedulerPlugin extends Plugin
     {
         overlayManager.remove(overlay);
         rockStates.clear();
-        schedule.clear();
+        timers.clear();
     }
 
     public void debugRocks(int world) {
@@ -95,6 +113,15 @@ public class MiningSchedulerPlugin extends Plugin
     public void onGameTick(GameTick tick)
     {
         ++tickCount;
+
+        if (currentTimer == null || currentTimer.getEnd().isBefore(Instant.now()))
+        {
+            infoBoxManager.removeInfoBox(currentTimer);
+            currentTimer = timers.poll();
+            if (currentTimer != null) {
+                infoBoxManager.addInfoBox(currentTimer);
+            }
+        }
     }
 
     public void cleanupRocks(Map<WorldPoint, Rock> rocks)
@@ -102,8 +129,6 @@ public class MiningSchedulerPlugin extends Plugin
         for (Entry<WorldPoint, Rock> entry : rocks.entrySet())
         {
             Rock rock = entry.getValue();
-            WorldPoint location = entry.getKey();
-
             if (rock.isDepleted() &&
                     rock.getNextRespawnTime() != null &&
                     LocalDateTime.now().isAfter(rock.getNextRespawnTime()))
@@ -173,7 +198,6 @@ public class MiningSchedulerPlugin extends Plugin
         }
     }
 
-
     @Subscribe
     public void onGameObjectDespawned(GameObjectDespawned event)
     {
@@ -189,6 +213,16 @@ public class MiningSchedulerPlugin extends Plugin
             {
                 boolean depletedOnLogin = tickCount == 0;
                 rock.deplete(depletedOnLogin);
+
+                if (!depletedOnLogin)
+                {
+                    RespawnTimer timer = new RespawnTimer(rock.getRespawnDuration(),
+                                                          ChronoUnit.MINUTES,
+                                                          itemManager.getImage(ItemID.DRAGON_PICKAXE),
+                                                        this);
+                    timer.setTooltip("World " + Integer.toString(this.currentWorld));
+                    timers.add(timer);
+                }
             }
         }
     }

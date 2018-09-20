@@ -6,6 +6,11 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.*;
+import net.runelite.client.Notifier;
+import net.runelite.client.chat.ChatColorType;
+import net.runelite.client.chat.ChatMessageBuilder;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -36,7 +41,9 @@ import java.util.Queue;
 
 /**
  * TODO:
+ *  - Add configuration (notification on, target rocks, max timers in queue)
  *  - Add warning when trying to hop too many times in a row
+ *  - Refactor logic into smaller classes
  */
 
 @Slf4j
@@ -46,6 +53,12 @@ public class MiningSchedulerPlugin extends Plugin
 
     @Inject
     private Client client;
+
+    @Inject
+    private Notifier notifier;
+
+    @Inject
+    private ChatMessageManager chatMessageManager;
 
     @Inject
     private InfoBoxManager infoBoxManager;
@@ -62,7 +75,6 @@ public class MiningSchedulerPlugin extends Plugin
     private static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final Map<Integer, Map<WorldPoint, Rock>> rockStates = new HashMap<>();
-    //private final Map<Integer, RespawnTimer> timers = new HashMap<>();
     private final Queue<RespawnTimer> timers = new LinkedList<>();
 
 
@@ -70,7 +82,7 @@ public class MiningSchedulerPlugin extends Plugin
     private RespawnTimer currentTimer;
     private Integer currentWorld;
     private boolean hasLoaded;
-    private Integer tickCount = 0;
+    private boolean alreadyTicked;
 
     @Override
     protected void startUp() throws Exception
@@ -112,11 +124,26 @@ public class MiningSchedulerPlugin extends Plugin
     @Subscribe
     public void onGameTick(GameTick tick)
     {
-        ++tickCount;
+        alreadyTicked = true;
 
         if (currentTimer == null || currentTimer.getEnd().isBefore(Instant.now()))
         {
-            infoBoxManager.removeInfoBox(currentTimer);
+            //todo refactor dumb logic below
+            if (currentTimer != null)
+            {
+                String chatMessage = "Respawned rock at " + currentTimer.getTooltip();
+
+                final String message = new ChatMessageBuilder()
+                        .append(ChatColorType.HIGHLIGHT)
+                        .append(chatMessage)
+                        .build();
+
+                chatMessageManager.queue(QueuedMessage.builder()
+                        .type(ChatMessageType.GAME)
+                        .runeLiteFormattedMessage(message)
+                        .build());
+                infoBoxManager.removeInfoBox(currentTimer);
+            }
             currentTimer = timers.poll();
             if (currentTimer != null) {
                 infoBoxManager.addInfoBox(currentTimer);
@@ -143,7 +170,9 @@ public class MiningSchedulerPlugin extends Plugin
         System.out.println(event.getGameState());
         switch (event.getGameState()) {
             case LOADING:
-                tickCount = 0;
+                //TODO create method for logic below
+                chatMessageManager.
+                alreadyTicked = false;
                 hasLoaded = false;
                 currentWorld = client.getWorld();
                 if (!rockStates.containsKey(currentWorld))
@@ -211,11 +240,20 @@ public class MiningSchedulerPlugin extends Plugin
             Rock rock = rocks.get(location);
             if (!rock.isDepleted())
             {
-                boolean depletedOnLogin = tickCount == 0;
-                rock.deplete(depletedOnLogin);
-
-                if (!depletedOnLogin)
+                rock.deplete(!alreadyTicked);
+                if (alreadyTicked)
                 {
+                    String chatMessage = "Depleted rock!";
+
+                    final String message = new ChatMessageBuilder()
+                            .append(ChatColorType.HIGHLIGHT)
+                            .append(chatMessage)
+                            .build();
+                    notifier.notify(chatMessage);
+                    chatMessageManager.queue(QueuedMessage.builder()
+                            .type(ChatMessageType.GAME)
+                            .runeLiteFormattedMessage(message)
+                            .build());
                     RespawnTimer timer = new RespawnTimer(rock.getRespawnDuration(),
                                                           ChronoUnit.MINUTES,
                                                           itemManager.getImage(ItemID.DRAGON_PICKAXE),

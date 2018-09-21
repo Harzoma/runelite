@@ -9,9 +9,9 @@ public enum RockType
 {
     //IRON            (ImmutableSet.of(7455, 7488), 0),
     //COAL            (ImmutableSet.of(7456, 7489), 0),
-    //MITHRIL         (ImmutableSet.of(7459, 7492), 2),
+    MITHRIL         (ImmutableSet.of(7459, 7492), 2),
     ADAMANTITE      (ImmutableSet.of(7460, 7493), 4),
-    RUNITE          (ImmutableSet.of(7461, 7494), 12);
+    RUNITE          (ImmutableSet.of(7461, 7494), 6);
 
     @Getter
     private final Set gameIds;

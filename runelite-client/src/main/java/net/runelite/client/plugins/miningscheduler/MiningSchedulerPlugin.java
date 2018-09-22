@@ -41,7 +41,11 @@ import java.util.Queue;
  * TODO LIST:
  *  - Add warning when trying to hop too many times in a row
  *  - Refactor logic into smaller classes (timer manager)
+ *  - Implement cleanup method when loading a new area
+ *
+ * BUG LIST:
  *  - Adjust timer and respawn (there are some delays sometimes)
+ *  - Restrict mining guild half respawn time regions to P2P only
  */
 
 @Slf4j
@@ -87,6 +91,7 @@ public class MiningSchedulerPlugin extends Plugin
 
     private Map<WorldPoint, Rock> rocks;
     private RespawnTimer currentTimer;
+    private RockType currentTargetType;
     private int currentWorld;
     private boolean hasLoaded;
     private boolean alreadyTicked;
@@ -97,6 +102,7 @@ public class MiningSchedulerPlugin extends Plugin
         overlayManager.add(overlay);
         System.out.println("Started Runite Plugin");
         currentWorld = client.getWorld();
+        currentTargetType = config.targetRockType();
         hasLoaded = false;
     }
 
@@ -104,9 +110,17 @@ public class MiningSchedulerPlugin extends Plugin
     protected void shutDown() throws Exception
     {
         overlayManager.remove(overlay);
+        reset();
+    }
+
+    private void reset()
+    {
+        System.out.println("Resetting...");
         rockStates.clear();
         timers.clear();
         infoBoxManager.removeInfoBox(currentTimer);
+        currentTimer = null;
+        client.clearHintArrow();
     }
 
     public void debugRocks(int world) {
@@ -228,7 +242,7 @@ public class MiningSchedulerPlugin extends Plugin
         int objectId = gameObject.getId();
         WorldPoint location = gameObject.getWorldLocation();
 
-        if (config.targetRockType().getGameIds().contains(objectId))
+        if (currentTargetType.getGameIds().contains(objectId))
         {
             if (rocks.containsKey(location))
             {
@@ -247,8 +261,7 @@ public class MiningSchedulerPlugin extends Plugin
             }
             else
             {
-                RockType rockType = config.targetRockType();
-                Rock newRock = new Rock(rockType, location);
+                Rock newRock = new Rock(currentTargetType, location);
                 rocks.put(location, newRock);
             }
         }
@@ -261,9 +274,18 @@ public class MiningSchedulerPlugin extends Plugin
         int objectId = gameObject.getId();
         WorldPoint location = gameObject.getWorldLocation();
 
-        if (config.targetRockType().getGameIds().contains(objectId))
+        if (currentTargetType.getGameIds().contains(objectId))
         {
-            Rock rock = rocks.get(location);
+            Rock rock;
+            if (!rocks.containsKey(location))
+            {
+                rock = new Rock(currentTargetType, location);
+            }
+            else
+            {
+                rock = rocks.get(location);
+            }
+
             if (!rock.isDepleted())
             {
                 rock.deplete(!alreadyTicked);
@@ -281,6 +303,20 @@ public class MiningSchedulerPlugin extends Plugin
                     timer.setTooltip("World " + Integer.toString(this.currentWorld));
                     timers.add(timer);
                 }
+            }
+        }
+    }
+
+    @Subscribe
+    private void onConfigChanged(ConfigChanged event)
+    {
+        if (event.getGroup().equals("miningscheduler"))
+        {
+            if (currentTargetType != config.targetRockType())
+            {
+                System.out.println("Changed target type to: " + config.targetRockType().getName());
+                currentTargetType = config.targetRockType();
+                reset();
             }
         }
     }

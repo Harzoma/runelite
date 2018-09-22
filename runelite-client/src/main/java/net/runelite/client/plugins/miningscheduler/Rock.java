@@ -1,14 +1,19 @@
 package net.runelite.client.plugins.miningscheduler;
 
+import com.google.common.collect.ImmutableSet;
 import lombok.Getter;
+import net.runelite.api.World;
 import net.runelite.api.coords.WorldPoint;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Set;
 
 public class Rock
 {
     private static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final Set<Integer> MINING_GUILD_REGIONS = ImmutableSet.of(11927, 11928, 12183, 12184, 12439, 12440);
+
 
     private final RockType type;
     private final WorldPoint location;
@@ -16,6 +21,7 @@ public class Rock
     @Getter
     private Boolean isDepleted;
     private LocalDateTime nextRespawn;
+    private Boolean isInMiningGuild;
 
     public Rock(RockType type, WorldPoint location)
     {
@@ -23,12 +29,18 @@ public class Rock
         this.type = type;
         this.location = location;
         isDepleted = false;
+        isInMiningGuild = isInMiningGuild(location);
         nextRespawn = null;
     }
 
-    public String getType()
+    public static boolean isInMiningGuild(WorldPoint location)
     {
-        return this.type.toString();
+        return MINING_GUILD_REGIONS.contains(location.getRegionID());
+    }
+
+    public RockType getType()
+    {
+        return this.type;
     }
 
     public String getTypeString()
@@ -43,7 +55,8 @@ public class Rock
 
     public long getRespawnDuration()
     {
-        return this.type.getRespawnTime();
+        long respawnTime = this.type.getRespawnTime();
+        return isInMiningGuild ? respawnTime / 2 : respawnTime;
     }
 
     public LocalDateTime getNextRespawnTime()
@@ -65,8 +78,9 @@ public class Rock
     {
         System.out.println("Depleted " + this.getType() + " at " + location.toString());
         isDepleted = true;
-        if (!depletedOnLogin) {
-            nextRespawn = LocalDateTime.now().plusMinutes(this.getRespawnDuration());
+        if (!depletedOnLogin)
+        {
+            nextRespawn = LocalDateTime.now().plusSeconds(this.getRespawnDuration());
             System.out.println("Next respawn at " +  this.getNextRespawnTime().format(dateFormat));
         }
     }

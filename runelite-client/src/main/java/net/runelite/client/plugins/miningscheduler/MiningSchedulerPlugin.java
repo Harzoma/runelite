@@ -18,14 +18,12 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
-import net.runelite.client.ui.overlay.infobox.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -43,11 +41,8 @@ import java.util.Queue;
 
 /**
  * TODO LIST:
- *  - Add arrow pointing towards target rock when they spawn
- *  - Halve respawn time if player is in mining guild
  *  - Add warning when trying to hop too many times in a row
  *  - Refactor logic into smaller classes (timer manager)
- *  - Associate rock to timer
  *  - Adjust timer and respawn (there are some delays sometimes)
  */
 
@@ -60,6 +55,9 @@ public class MiningSchedulerPlugin extends Plugin
     private Client client;
 
     @Inject
+    private ItemManager itemManager;
+
+    @Inject
     private Notifier notifier;
 
     @Inject
@@ -67,9 +65,6 @@ public class MiningSchedulerPlugin extends Plugin
 
     @Inject
     private InfoBoxManager infoBoxManager;
-
-    @Inject
-    private ItemManager itemManager;
 
     @Inject
     private OverlayManager overlayManager;
@@ -94,7 +89,7 @@ public class MiningSchedulerPlugin extends Plugin
 
     private Map<WorldPoint, Rock> rocks;
     private RespawnTimer currentTimer;
-    private Integer currentWorld;
+    private int currentWorld;
     private boolean hasLoaded;
     private boolean alreadyTicked;
 
@@ -149,10 +144,19 @@ public class MiningSchedulerPlugin extends Plugin
                 String chatMessage = "Respawned rock at " + currentTimer.getTooltip();
                 sendChatMessage(chatMessage, ChatColorType.HIGHLIGHT, ChatMessageType.GAME);
                 infoBoxManager.removeInfoBox(currentTimer);
+                client.clearHintArrow();
             }
             currentTimer = timers.poll();
             if (currentTimer != null) {
                 infoBoxManager.addInfoBox(currentTimer);
+            }
+        }
+        else
+        {
+            if (currentWorld == currentTimer.getWorld() &&
+                    currentTimer.getEnd().minusSeconds(10).isBefore(Instant.now()))
+            {
+                client.setHintArrow(currentTimer.getRock().getLocation());
             }
         }
     }
@@ -184,28 +188,31 @@ public class MiningSchedulerPlugin extends Plugin
         }
     }
 
+    private void onLoading() {
+        alreadyTicked = false;
+        hasLoaded = false;
+        currentWorld = client.getWorld();
+        if (!rockStates.containsKey(currentWorld))
+        {
+            System.out.println("Creating new rocks state for world " + currentWorld);
+            Map<WorldPoint, Rock> newRockState = new HashMap<>();
+            rockStates.put(currentWorld, newRockState);
+            rocks = newRockState;
+        }
+        else
+        {
+            System.out.println("Loading rocks state for world " + currentWorld);
+            rocks = rockStates.get(currentWorld);
+            cleanupRocks(rocks);
+        }
+    }
+
     @Subscribe
     private void onGameStateChanged(GameStateChanged event) {
         System.out.println(event.getGameState());
         switch (event.getGameState()) {
             case LOADING:
-                //TODO create method for logic below
-                alreadyTicked = false;
-                hasLoaded = false;
-                currentWorld = client.getWorld();
-                if (!rockStates.containsKey(currentWorld))
-                {
-                    System.out.println("Creating new rocks state for world " + currentWorld);
-                    Map<WorldPoint, Rock> newRockState = new HashMap<>();
-                    rockStates.put(currentWorld, newRockState);
-                    rocks = newRockState;
-                }
-                else
-                {
-                    System.out.println("Loading rocks state for world " + currentWorld);
-                    rocks = rockStates.get(currentWorld);
-                    cleanupRocks(rocks);
-                }
+                onLoading();
                 //todo remove debug code below
                 for (int world : rockStates.keySet())
                     debugRocks(world);
@@ -269,10 +276,10 @@ public class MiningSchedulerPlugin extends Plugin
                         notifier.notify("Depleted rock!");
                     }
 
-                    RespawnTimer timer = new RespawnTimer(rock.getRespawnDuration(),
-                                                          ChronoUnit.MINUTES,
-                                                          itemManager.getImage(ItemID.DRAGON_PICKAXE),
-                                                        this);
+                    RespawnTimer timer = new RespawnTimer(rock,
+                                                          currentWorld,
+                                                          itemManager.getImage(rock.getType().getIconId()),
+                                                          this);
                     timer.setTooltip("World " + Integer.toString(this.currentWorld));
                     timers.add(timer);
                 }

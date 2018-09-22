@@ -23,11 +23,33 @@ public interface MiningSchedulerConfig extends Config
             keyName = "targetRockType",
             name = "Target rock type",
             description = "Determines which type of rock will be tracked",
-            position = 4
+            position = 2
     )
     default RockType targetRockType()
     {
         return RockType.RUNITE;
+    }
+
+    @ConfigItem(
+            keyName = "respawnArrow",
+            name = "Display respawn arrow",
+            description = "Determines if a hint arrow should be displayed before the next rock respawns",
+            position = 3
+    )
+    default boolean displayRespawnArrow()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "respawnArrowTime",
+            name = "Respawn arrow time",
+            description = "Determines time in seconds before the next rock respawns the hint arrow should be displayed",
+            position = 4
+    )
+    default int getRespawnArrowTime()
+    {
+        return 20;
     }
 
 }

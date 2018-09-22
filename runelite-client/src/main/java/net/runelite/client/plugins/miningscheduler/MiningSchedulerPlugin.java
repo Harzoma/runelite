@@ -1,6 +1,5 @@
 package net.runelite.client.plugins.miningscheduler;
 
-import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +22,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -151,13 +149,12 @@ public class MiningSchedulerPlugin extends Plugin
                 infoBoxManager.addInfoBox(currentTimer);
             }
         }
-        else
+        else if ( config.displayRespawnArrow() &&
+                    currentWorld == currentTimer.getWorld() &&
+                    currentTimer.getEnd().minusSeconds(config.getRespawnArrowTime() + 1).isBefore(Instant.now()))
         {
-            if (currentWorld == currentTimer.getWorld() &&
-                    currentTimer.getEnd().minusSeconds(10).isBefore(Instant.now()))
-            {
                 client.setHintArrow(currentTimer.getRock().getLocation());
-            }
+
         }
     }
 
@@ -188,7 +185,8 @@ public class MiningSchedulerPlugin extends Plugin
         }
     }
 
-    private void onLoading() {
+    private void onLoading()
+    {
         alreadyTicked = false;
         hasLoaded = false;
         currentWorld = client.getWorld();
@@ -214,8 +212,8 @@ public class MiningSchedulerPlugin extends Plugin
             case LOADING:
                 onLoading();
                 //todo remove debug code below
-                for (int world : rockStates.keySet())
-                    debugRocks(world);
+                //for (int world : rockStates.keySet())
+                //    debugRocks(world);
                 break;
             case LOGGED_IN:
                 hasLoaded = true;

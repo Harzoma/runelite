@@ -274,22 +274,25 @@ public class MiningSchedulerPlugin extends Plugin
         int objectId = gameObject.getId();
         WorldPoint location = gameObject.getWorldLocation();
 
-        if (currentTargetType.getGameIds().contains(objectId))
+        if (hasLoaded && currentTargetType.getGameIds().contains(objectId))
         {
             Rock rock;
-            if (!rocks.containsKey(location))
+
+            if (rocks.containsKey(location))
             {
-                rock = new Rock(currentTargetType, location);
+                rock = rocks.get(location);
             }
             else
             {
-                rock = rocks.get(location);
+                rock = new Rock(currentTargetType, location);
             }
 
             if (!rock.isDepleted())
             {
-                rock.deplete(!alreadyTicked);
-                if (alreadyTicked)
+                boolean validDepletion = alreadyTicked &&
+                            rock.getLocation().distanceTo2D(client.getLocalPlayer().getWorldLocation()) <= 1;
+                rock.deplete(validDepletion);
+                if (validDepletion)
                 {
                     if (config.showNotifications())
                     {

@@ -74,11 +74,11 @@ public class Rock
         return isDepleted;
     }
 
-    public void deplete(boolean depletedOnLogin)
+    public void deplete(boolean validDepletion)
     {
         System.out.println("Depleted " + this.getType() + " at " + location.toString());
         isDepleted = true;
-        if (!depletedOnLogin)
+        if (validDepletion)
         {
             nextRespawn = LocalDateTime.now().plusSeconds(this.getRespawnDuration());
             System.out.println("Next respawn at " +  this.getNextRespawnTime().format(dateFormat));

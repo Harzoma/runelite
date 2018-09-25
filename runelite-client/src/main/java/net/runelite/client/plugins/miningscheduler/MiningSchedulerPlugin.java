@@ -39,9 +39,12 @@ import java.util.Queue;
 
 /**
  * TODO LIST:
+ *  - Rename validDepletion variable to something better
+ *  - Implement Schedule Manager class and move timer methods to it
  *  - Add warning when trying to hop too many times in a row
  *  - Refactor logic into smaller classes (timer manager)
  *  - Implement cleanup method when loading a new area
+ *  - TESTS!
  *
  * BUG LIST:
  *  - Adjust timer and respawn (there are some delays sometimes)
@@ -100,7 +103,7 @@ public class MiningSchedulerPlugin extends Plugin
     protected void startUp() throws Exception
     {
         overlayManager.add(overlay);
-        System.out.println("Started Runite Plugin");
+        logger.info("Started Runite Plugin");
         currentWorld = client.getWorld();
         currentTargetType = config.targetRockType();
         hasLoaded = false;
@@ -115,7 +118,7 @@ public class MiningSchedulerPlugin extends Plugin
 
     private void reset()
     {
-        System.out.println("Resetting...");
+        logger.info("Resetting...");
         rockStates.clear();
         timers.clear();
         infoBoxManager.removeInfoBox(currentTimer);
@@ -124,29 +127,38 @@ public class MiningSchedulerPlugin extends Plugin
     }
 
     public void debugRocks(int world) {
-        System.out.println("\n\nDebugging rock states for world " + world);
+        logger.info("\n\nDebugging rock states for world " + world);
 
         for (WorldPoint location : rockStates.get(world).keySet()) {
             Rock rock = rockStates.get(world).get(location);
             if (rock.isDepleted()) {
-                System.out.println("Depleted " + rock.getTypeString() + " at " + location.toString());
+                logger.info("Depleted " + rock.getTypeString() + " at " + location.toString());
                 if (rock.getNextRespawnTime() != null)
                 {
-                    System.out.println("Respawns at " + rock.getNextRespawnTime().format(dateFormat));
+                    logger.info("Respawns at " + rock.getNextRespawnTime().format(dateFormat));
                 }
 
             }
             else {
-                System.out.println(rock.getTypeString() + " at " + location.toString());
+                logger.info(rock.getTypeString() + " at " + location.toString());
             }
         }
-        System.out.println("\n\n");
+        logger.info("\n\n");
     }
 
     @Subscribe
     public void onGameTick(GameTick tick)
     {
         alreadyTicked = true;
+
+        /* Distance debug * /
+        if (!rocks.isEmpty())
+        {
+            WorldPoint rockLoc = rocks.entrySet().iterator().next().getValue().getLocation();
+            //logger.info("" + client.getLocalPlayer().getWorldLocation().isInScene(client));
+            logger.info("" + rockLoc.distanceTo2D(client.getLocalPlayer().getWorldLocation()));
+        }
+        /* */
 
         if (currentTimer == null || currentTimer.getEnd().isBefore(Instant.now()))
         {
@@ -206,14 +218,14 @@ public class MiningSchedulerPlugin extends Plugin
         currentWorld = client.getWorld();
         if (!rockStates.containsKey(currentWorld))
         {
-            System.out.println("Creating new rocks state for world " + currentWorld);
+            logger.info("Creating new rocks state for world " + currentWorld);
             Map<WorldPoint, Rock> newRockState = new HashMap<>();
             rockStates.put(currentWorld, newRockState);
             rocks = newRockState;
         }
         else
         {
-            System.out.println("Loading rocks state for world " + currentWorld);
+            logger.info("Loading rocks state for world " + currentWorld);
             rocks = rockStates.get(currentWorld);
             cleanupRocks(rocks);
         }
@@ -221,7 +233,7 @@ public class MiningSchedulerPlugin extends Plugin
 
     @Subscribe
     private void onGameStateChanged(GameStateChanged event) {
-        System.out.println(event.getGameState());
+        logger.info("" + event.getGameState());
         switch (event.getGameState()) {
             case LOADING:
                 onLoading();
@@ -290,7 +302,8 @@ public class MiningSchedulerPlugin extends Plugin
             if (!rock.isDepleted())
             {
                 boolean validDepletion = alreadyTicked &&
-                            rock.getLocation().distanceTo2D(client.getLocalPlayer().getWorldLocation()) <= 1;
+                        rock.getLocation().distanceTo2D(client.getLocalPlayer().getWorldLocation()) <= 3;
+
                 rock.deplete(validDepletion);
                 if (validDepletion)
                 {
@@ -317,7 +330,7 @@ public class MiningSchedulerPlugin extends Plugin
         {
             if (currentTargetType != config.targetRockType())
             {
-                System.out.println("Changed target type to: " + config.targetRockType().getName());
+                logger.info("Changed target type to: " + config.targetRockType().getName());
                 currentTargetType = config.targetRockType();
                 reset();
             }

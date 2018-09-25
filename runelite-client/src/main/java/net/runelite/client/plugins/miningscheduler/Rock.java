@@ -4,6 +4,8 @@ import com.google.common.collect.ImmutableSet;
 import lombok.Getter;
 import net.runelite.api.World;
 import net.runelite.api.coords.WorldPoint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -11,9 +13,10 @@ import java.util.Set;
 
 public class Rock
 {
+    private static final Logger logger = LoggerFactory.getLogger(MiningSchedulerPlugin.class);
+
     private static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final Set<Integer> MINING_GUILD_REGIONS = ImmutableSet.of(11927, 11928, 12183, 12184, 12439, 12440);
-
 
     private final RockType type;
     private final WorldPoint location;
@@ -25,7 +28,7 @@ public class Rock
 
     public Rock(RockType type, WorldPoint location)
     {
-        System.out.println("Registering " + type + " at " + location.toString());
+        logger.info("Registering " + type + " at " + location.toString());
         this.type = type;
         this.location = location;
         isDepleted = false;
@@ -76,12 +79,12 @@ public class Rock
 
     public void deplete(boolean validDepletion)
     {
-        System.out.println("Depleted " + this.getType() + " at " + location.toString());
+        logger.info("Depleted " + this.getType() + " at " + location.toString());
         isDepleted = true;
         if (validDepletion)
         {
             nextRespawn = LocalDateTime.now().plusSeconds(this.getRespawnDuration());
-            System.out.println("Next respawn at " +  this.getNextRespawnTime().format(dateFormat));
+            logger.info("Next respawn at " +  this.getNextRespawnTime().format(dateFormat));
         }
     }
 
@@ -89,7 +92,7 @@ public class Rock
     {
         isDepleted = false;
         nextRespawn = null;
-        System.out.println("Respawned " + this.getType() + " at " + location.toString());
+        logger.info("Respawned " + this.getType() + " at " + location.toString());
     }
 
     public boolean isRespawnUnknown()

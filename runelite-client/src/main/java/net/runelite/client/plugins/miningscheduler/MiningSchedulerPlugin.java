@@ -47,8 +47,11 @@ import java.util.Queue;
  *  - TESTS!
  *
  * BUG LIST:
+ *  - Adjust distance value to ignore invalid depletions
+ *      e.g. max radius if player.stopped() else 1
  *  - Adjust timer and respawn (there are some delays sometimes)
  *  - Restrict mining guild half respawn time regions to P2P only
+ *  - Fix post login respawn spam
  */
 
 @Slf4j
@@ -86,7 +89,10 @@ public class MiningSchedulerPlugin extends Plugin
         return configManager.getConfig(MiningSchedulerConfig.class);
     }
 
-    private static final DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final int MAXIMUM_RADIUS  = 5;
+    private static final int MININUM_RADIUS  = 1;
+
 
     private final Map<Integer, Map<WorldPoint, Rock>> rockStates = new HashMap<>();
     private final Queue<RespawnTimer> timers = new LinkedList<>();
@@ -98,6 +104,8 @@ public class MiningSchedulerPlugin extends Plugin
     private int currentWorld;
     private boolean hasLoaded;
     private boolean alreadyTicked;
+    private WorldPoint currentPlayerLocation;
+    private boolean isPlayerStopped;
 
     @Override
     protected void startUp() throws Exception
@@ -135,7 +143,7 @@ public class MiningSchedulerPlugin extends Plugin
                 logger.info("Depleted " + rock.getTypeString() + " at " + location.toString());
                 if (rock.getNextRespawnTime() != null)
                 {
-                    logger.info("Respawns at " + rock.getNextRespawnTime().format(dateFormat));
+                    logger.info("Respawns at " + rock.getNextRespawnTime().format(DATE_FORMAT));
                 }
 
             }
@@ -159,6 +167,9 @@ public class MiningSchedulerPlugin extends Plugin
             logger.info("" + rockLoc.distanceTo2D(client.getLocalPlayer().getWorldLocation()));
         }
         /* */
+
+        isPlayerStopped = client.getLocalPlayer().getWorldLocation().equals(currentPlayerLocation);
+        currentPlayerLocation = client.getLocalPlayer().getWorldLocation();
 
         if (currentTimer == null || currentTimer.getEnd().isBefore(Instant.now()))
         {
@@ -279,6 +290,11 @@ public class MiningSchedulerPlugin extends Plugin
         }
     }
 
+    private int getDepletionRadius()
+    {
+        return isPlayerStopped ? MAXIMUM_RADIUS : MININUM_RADIUS;
+    }
+
     @Subscribe
     public void onGameObjectDespawned(GameObjectDespawned event)
     {
@@ -302,7 +318,8 @@ public class MiningSchedulerPlugin extends Plugin
             if (!rock.isDepleted())
             {
                 boolean validDepletion = alreadyTicked &&
-                        rock.getLocation().distanceTo2D(client.getLocalPlayer().getWorldLocation()) <= 3;
+                        rock.getLocation()
+                                .distanceTo2D(client.getLocalPlayer().getWorldLocation()) <= getDepletionRadius();
 
                 rock.deplete(validDepletion);
                 if (validDepletion)

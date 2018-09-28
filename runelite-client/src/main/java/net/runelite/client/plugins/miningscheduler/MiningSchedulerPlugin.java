@@ -47,8 +47,6 @@ import java.util.Queue;
  *  - TESTS!
  *
  * BUG LIST:
- *  - Adjust distance value to ignore invalid depletions
- *      e.g. max radius if player.stopped() else 1
  *  - Adjust timer and respawn (there are some delays sometimes)
  *  - Restrict mining guild half respawn time regions to P2P only
  *  - Fix post login respawn spam
@@ -111,10 +109,9 @@ public class MiningSchedulerPlugin extends Plugin
     protected void startUp() throws Exception
     {
         overlayManager.add(overlay);
-        logger.info("Started Runite Plugin");
-        currentWorld = client.getWorld();
+        logger.info("Started Mining Scheduler Plugin");
         currentTargetType = config.targetRockType();
-        hasLoaded = false;
+        onLoading();
     }
 
     @Override
@@ -134,40 +131,10 @@ public class MiningSchedulerPlugin extends Plugin
         client.clearHintArrow();
     }
 
-    public void debugRocks(int world) {
-        logger.info("\n\nDebugging rock states for world " + world);
-
-        for (WorldPoint location : rockStates.get(world).keySet()) {
-            Rock rock = rockStates.get(world).get(location);
-            if (rock.isDepleted()) {
-                logger.info("Depleted " + rock.getTypeString() + " at " + location.toString());
-                if (rock.getNextRespawnTime() != null)
-                {
-                    logger.info("Respawns at " + rock.getNextRespawnTime().format(DATE_FORMAT));
-                }
-
-            }
-            else {
-                logger.info(rock.getTypeString() + " at " + location.toString());
-            }
-        }
-        logger.info("\n\n");
-    }
-
     @Subscribe
     public void onGameTick(GameTick tick)
     {
         alreadyTicked = true;
-
-        /* Distance debug * /
-        if (!rocks.isEmpty())
-        {
-            WorldPoint rockLoc = rocks.entrySet().iterator().next().getValue().getLocation();
-            //logger.info("" + client.getLocalPlayer().getWorldLocation().isInScene(client));
-            logger.info("" + rockLoc.distanceTo2D(client.getLocalPlayer().getWorldLocation()));
-        }
-        /* */
-
         isPlayerStopped = client.getLocalPlayer().getWorldLocation().equals(currentPlayerLocation);
         currentPlayerLocation = client.getLocalPlayer().getWorldLocation();
 
@@ -248,9 +215,6 @@ public class MiningSchedulerPlugin extends Plugin
         switch (event.getGameState()) {
             case LOADING:
                 onLoading();
-                //todo remove debug code below
-                //for (int world : rockStates.keySet())
-                //    debugRocks(world);
                 break;
             case LOGGED_IN:
                 hasLoaded = true;
